@@ -36,10 +36,8 @@ public class RepositoryService {
     public void cloneAllRepositories(int threads, int timeout) {
         File cloneDir = new File(DIRECTORY_PATH);
 
-        if (!cloneDir.exists()) {
-            if (!cloneDir.mkdirs()) {
-                System.err.println("Failed to create directory: " + cloneDir.getAbsolutePath());
-            }
+        if (!cloneDir.exists() && !cloneDir.mkdirs()) {
+            System.err.println("Failed to create directory: " + cloneDir.getAbsolutePath());
         }
 
         AtomicInteger failedCount = new AtomicInteger(0);

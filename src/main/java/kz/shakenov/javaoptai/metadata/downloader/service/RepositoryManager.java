@@ -9,9 +9,11 @@ import kz.shakenov.javaoptai.metadata.downloader.model.GitHubRepository;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Singleton
 public class RepositoryManager {
@@ -41,18 +43,16 @@ public class RepositoryManager {
     }
 
     private HashMap<Integer, GitHubRepository> loadExistingRepositories() {
+        Path filePath = Paths.get(FILE_PATH);
+
+        if (!Files.exists(filePath)) {
+            return new HashMap<>();
+        }
+
         try {
-            if (Files.exists(Paths.get(FILE_PATH))) {
-                List<GitHubRepository> repoList = objectMapper.readValue(new File(FILE_PATH), new TypeReference<>() {
-                });
-                HashMap<Integer, GitHubRepository> repoMap = new HashMap<>();
-                for (GitHubRepository repo : repoList) {
-                    repoMap.put(repo.getId(), repo);
-                }
-                return repoMap;
-            } else {
-                return new HashMap<>();
-            }
+            List<GitHubRepository> repoList = objectMapper.readValue(filePath.toFile(), new TypeReference<>() {});
+            return repoList.stream()
+                    .collect(Collectors.toMap(GitHubRepository::getId, repo -> repo, (oldValue, newValue) -> oldValue, HashMap::new));
         } catch (IOException e) {
             System.err.println("Error loading existing repositories: " + e.getMessage());
             return new HashMap<>();
@@ -61,19 +61,15 @@ public class RepositoryManager {
 
     public void saveRepositories(List<GitHubRepository> repositoryList) {
         try {
-            int newRepoIndex = 0;
-            for (GitHubRepository newRepo : repositoryList) {
-                // check if repository is already in the file
-                if (!existingRepositories.containsKey(newRepo.getId())) {
-                    existingRepositories.put(newRepo.getId(), newRepo);
-                    newRepoIndex++;
-                }
-            }
+            long newRepoCount = repositoryList.stream()
+                    .filter(repo -> existingRepositories.putIfAbsent(repo.getId(), repo) == null)
+                    .count();
 
             objectMapper.writeValue(new File(FILE_PATH), existingRepositories.values());
-            System.out.println(newRepoIndex + " new repositories saved successfully in: " + FILE_PATH);
+            System.out.println(newRepoCount + " new repositories saved successfully in: " + FILE_PATH);
         } catch (IOException e) {
             System.err.println("Error when saving repositories to a file: " + e.getMessage());
         }
     }
+
 }
